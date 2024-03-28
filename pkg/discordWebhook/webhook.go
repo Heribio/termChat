@@ -22,7 +22,7 @@ func SendMessage(content Message, webhookUrl string) {
     req, err := http.Post(webhookUrl, "application/json", bytes.NewBuffer(payload))
     if err != nil {
         fmt.Printf("Alas, there's been an error: %v", err)
+        fmt.Println(req)
         os.Exit(1)
     }
-    fmt.Println(req.Status)
 }

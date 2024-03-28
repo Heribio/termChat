@@ -1,84 +1,110 @@
 package cli
 
-import (
-	"fmt"
+import (	
+    "fmt"
 	"log"
-	"time"
+	"strings"
 
-	"github.com/marcusolsson/tui-go"
+	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
+    "github.com/Heribio/termChat/internal/discord"
+    "github.com/Heribio/termChat/pkg/discordWebhook"
 )
 
-type post struct {
-	username string
-	message  string
-	time     string
-}
-
-var posts = []post{
-	{username: "john", message: "hi, what's up?", time: "14:41"},
-	{username: "jane", message: "not much", time: "14:43"},
-}
-
 func Run() {
-	sidebar := tui.NewVBox(
-		tui.NewLabel("CHANNELS"),
-		tui.NewLabel("general"),
-		tui.NewLabel("random"),
-		tui.NewLabel(""),
-		tui.NewLabel("DIRECT MESSAGES"),
-		tui.NewLabel("slackbot"),
-		tui.NewSpacer(),
+	p := tea.NewProgram(initialModel())
+
+	if _, err := p.Run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+type (
+	errMsg error
+)
+
+type model struct {
+	viewport    viewport.Model
+	messages    []string
+	textarea    textarea.Model
+	senderStyle lipgloss.Style
+	err         error
+}
+
+func initialModel() model {
+	ta := textarea.New()
+	ta.Placeholder = "Send a message..."
+	ta.Focus()
+
+	ta.Prompt = "┃ "
+	ta.CharLimit = 280
+
+	ta.SetWidth(30)
+	ta.SetHeight(3)
+
+	// Remove cursor line styling
+	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+
+	ta.ShowLineNumbers = false
+
+	vp := viewport.New(30, 5)
+	vp.SetContent(`Chat with Friends !
+Type a message and press Enter to send.`)
+
+	ta.KeyMap.InsertNewline.SetEnabled(false)
+
+	return model{
+		textarea:    ta,
+		messages:    []string{},
+		viewport:    vp,
+		senderStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
+		err:         nil,
+	}
+}
+
+func (m model) Init() tea.Cmd {
+	return textarea.Blink
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var (
+		tiCmd tea.Cmd
+		vpCmd tea.Cmd
 	)
-	sidebar.SetBorder(true)
 
-	history := tui.NewVBox()
+	m.textarea, tiCmd = m.textarea.Update(msg)
+	m.viewport, vpCmd = m.viewport.Update(msg)
 
-	for _, m := range posts {
-		history.Append(tui.NewHBox(
-			tui.NewLabel(m.time),
-			tui.NewPadder(1, 0, tui.NewLabel(fmt.Sprintf("<%s>", m.username))),
-			tui.NewLabel(m.message),
-			tui.NewSpacer(),
-		))
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC, tea.KeyEsc:
+			fmt.Println(m.textarea.Value())
+			return m, tea.Quit
+		case tea.KeyEnter:
+            discord.SendMessage(discordWebhook.Message{Content: m.textarea.Value(), Username: "Heribio"})
+			m.messages = append(m.messages, m.senderStyle.Render("You: ")+m.textarea.Value())
+			m.viewport.SetContent(strings.Join(m.messages, "\n"))
+			m.textarea.Reset()
+			m.viewport.GotoBottom()
+		}
+
+	// We handle errors just like any other message
+	case errMsg:
+		m.err = msg
+		return m, nil
 	}
 
-	historyScroll := tui.NewScrollArea(history)
-	historyScroll.SetAutoscrollToBottom(true)
+	return m, tea.Batch(tiCmd, vpCmd)
+}
 
-	historyBox := tui.NewVBox(historyScroll)
-	historyBox.SetBorder(true)
-
-	input := tui.NewEntry()
-	input.SetFocused(true)
-	input.SetSizePolicy(tui.Expanding, tui.Maximum)
-
-	inputBox := tui.NewHBox(input)
-	inputBox.SetBorder(true)
-	inputBox.SetSizePolicy(tui.Expanding, tui.Maximum)
-
-	chat := tui.NewVBox(historyBox, inputBox)
-	chat.SetSizePolicy(tui.Expanding, tui.Expanding)
-
-	input.OnSubmit(func(e *tui.Entry) {
-		history.Append(tui.NewHBox(
-			tui.NewLabel(time.Now().Format("15:04")),
-			tui.NewPadder(1, 0, tui.NewLabel(fmt.Sprintf("<%s>", "john"))),
-			tui.NewLabel(e.Text()),
-			tui.NewSpacer(),
-		))
-		input.SetText("")
-	})
-
-	root := tui.NewHBox(sidebar, chat)
-
-	ui, err := tui.New(root)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ui.SetKeybinding("Esc", func() { ui.Quit() })
-
-	if err := ui.Run(); err != nil {
-		log.Fatal(err)
-	}
+func (m model) View() string {
+	return fmt.Sprintf(
+		"%s\n\n%s",
+		m.viewport.View(),
+		m.textarea.View(),
+	) + "\n\n"
 }

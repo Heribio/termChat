@@ -1,11 +1,9 @@
 package main
 
 import (
-//   "github.com/Heribio/termChat/internal/cli" 
-   "github.com/Heribio/termChat/internal/discord"
+   "github.com/Heribio/termChat/internal/cli" 
 )
 
 func main() {
-//   cli.Run()     
-   discord.SendMessage("Test")
+    cli.Run()
 }
