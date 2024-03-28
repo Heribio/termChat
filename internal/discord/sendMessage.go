@@ -8,17 +8,18 @@ import (
     "github.com/Heribio/termChat/pkg/discordWebhook"
 )
 
-func SendMessage(message string) {
+type Secrets struct {
+    WEBHOOK_URL string `json:"WEBHOOK_URL"`
+}
+
+
+func SendMessage(message discordWebhook.Message) {
     jsonFile, err := os.Open("../../SECRETS/secrets.json")
     if err != nil {
         fmt.Println(err)
+        os.Exit(1)
     }
-
     byteValue, err := io.ReadAll(jsonFile)
-
-    type Secrets struct {
-        WEBHOOK_URL string `json:"WEBHOOK_URL"`
-    }
 
     var result Secrets
 
