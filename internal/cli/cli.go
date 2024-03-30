@@ -3,7 +3,6 @@ package cli
 import (	
     "fmt"
 	"log"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -86,10 +85,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case tea.KeyEnter:
             discord.SendMessage(discordWebhook.Message{Content: m.textarea.Value(), Username: "Heribio"})
-			m.messages = append(m.messages, m.senderStyle.Render("You: ")+m.textarea.Value())
-			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.textarea.Reset()
+/*
+            m.messages = append(m.messages, m.senderStyle.Render("You: ")+m.textarea.Value())
+			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.viewport.GotoBottom()
+*/
 		}
 
 	// We handle errors just like any other message
