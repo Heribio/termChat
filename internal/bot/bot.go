@@ -1,7 +1,6 @@
 package bot
 
 import (
-//    "github.com/Heribio/termChat/internal/cli"
     "github.com/Goscord/goscord/goscord"
     "github.com/Goscord/goscord/goscord/discord"
     "github.com/Goscord/goscord/goscord/gateway"
@@ -44,9 +43,7 @@ func RunBot() {
 
 
     client.On(event.EventMessageCreate, func(msg *discord.Message) {
-
         messages = append(messages, discordMessage{Content: msg.Content, Username: msg.Author.Username})
-        fmt.Println(msg.Username + ": " + msg.Content)
     })
     
     client.Login()
@@ -64,9 +61,3 @@ func RunServer() {
     })
     http.ListenAndServe(":8080", nil)
 }
-
-/*
-../../internal/bot/bot.go:48:1: syntax error: non-declaration statement outside function body
-../../internal/bot/bot.go:48:67: method has multiple receivers
-../../internal/bot/bot.go:50:2: syntax error: unexpected ) after top level declaration
-*/
