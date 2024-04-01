@@ -3,6 +3,11 @@ package cli
 import (	
     "fmt"
 	"log"
+    "net/http"
+    "time"
+"strings"
+    "io"
+    "encoding/json"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -15,6 +20,14 @@ import (
 
 func Run() {
 	p := tea.NewProgram(initialModel())
+    
+    go func() {
+        for {
+            messages := CheckForMessages()
+            time.Sleep( 1 * time.Millisecond * 200)
+            p.Send(messageList(messages))
+        }
+    }()
 
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
@@ -33,6 +46,13 @@ type model struct {
 	err         error
 }
 
+type messageList []discordMessage
+
+type discordMessage struct {
+    Content string `json:"content"`
+    Username string `json:"username"`
+}
+
 func initialModel() model {
 	ta := textarea.New()
 	ta.Placeholder = "Send a message..."
@@ -49,7 +69,7 @@ func initialModel() model {
 
 	ta.ShowLineNumbers = false
 
-	vp := viewport.New(30, 5)
+	vp := viewport.New(30, 30)
 	vp.SetContent(`Chat with Friends !
 Type a message and press Enter to send.`)
 
@@ -65,7 +85,35 @@ Type a message and press Enter to send.`)
 }
 
 func (m model) Init() tea.Cmd {
-	return textarea.Blink
+    return tea.Batch(
+        textarea.Blink,
+        //Refresh(),
+    )
+}
+
+func CheckForMessages() messageList{
+    url := "http://localhost:8080"
+    client := &http.Client{
+        Timeout: time.Second * 2,
+    }
+
+    req, err := client.Get(url)
+    if err != nil {
+        fmt.Println(err)
+    }
+    req.Header.Set("Accept", "application/json")
+    resp, err := io.ReadAll(req.Body)
+    defer req.Body.Close()
+    if err != nil {
+        fmt.Println(err)
+    }
+    var messages messageList
+
+    json.Unmarshal(resp, &messages)
+    if err != nil {
+        fmt.Println(err)
+    }
+    return messages
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -81,24 +129,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
-			fmt.Println(m.textarea.Value())
 			return m, tea.Quit
 		case tea.KeyEnter:
             discord.SendMessage(discordWebhook.Message{Content: m.textarea.Value(), Username: "Heribio"})
 			m.textarea.Reset()
-/*
-            m.messages = append(m.messages, m.senderStyle.Render("You: ")+m.textarea.Value())
-			m.viewport.SetContent(strings.Join(m.messages, "\n"))
-			m.viewport.GotoBottom()
-*/
 		}
-
-	// We handle errors just like any other message
+        case messageList:
+        m.messages = []string{}
+            for _, message := range msg {
+                m.messages = append(m.messages, m.senderStyle.Render(message.Username)+ ": " +message.Content)
+                m.viewport.SetContent(strings.Join(m.messages, "\n"))
+                m.viewport.GotoBottom()
+        }
 	case errMsg:
 		m.err = msg
 		return m, nil
 	}
-
 	return m, tea.Batch(tiCmd, vpCmd)
 }
 
